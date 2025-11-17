@@ -121,4 +121,4 @@ Suggestions and improvements are welcome! This is a standalone HTML file, so mod
 
 ---
 
-**Built for efficient mobile data classification workflows** 🚀
+**Built with Claude Code for efficient mobile data classification workflows** 🚀
