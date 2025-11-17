@@ -538,8 +538,15 @@
             // Remove BOM if present
             csv = csv.replace(/^\ufeff/, '');
 
-            const lines = csv.split('\n');
-            headers = parseCSVLine(lines[0]);
+            // Parse CSV into rows, respecting quoted fields with newlines
+            const rows = parseCSVRows(csv);
+
+            if (rows.length === 0) {
+                alert('No data found in CSV file!');
+                return;
+            }
+
+            headers = parseCSVLine(rows[0]);
 
             // Clean headers
             headers = headers.map(h => h.trim());
@@ -550,10 +557,10 @@
             }
 
             csvData = [];
-            for (let i = 1; i < lines.length; i++) {
-                if (lines[i].trim() === '') continue;
+            for (let i = 1; i < rows.length; i++) {
+                if (rows[i].trim() === '') continue;
 
-                const row = parseCSVLine(lines[i]);
+                const row = parseCSVLine(rows[i]);
                 if (row.length > 0) {
                     const rowObj = {};
                     headers.forEach((header, idx) => {
@@ -581,6 +588,51 @@
             } else {
                 alert('No data found in CSV file!');
             }
+        }
+
+        function parseCSVRows(csv) {
+            // Split CSV into rows while respecting quoted fields that may contain newlines
+            const rows = [];
+            let currentRow = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < csv.length; i++) {
+                const char = csv[i];
+
+                if (char === '"') {
+                    if (inQuotes && csv[i + 1] === '"') {
+                        // Escaped quote - add both quotes
+                        currentRow += '""';
+                        i++;
+                    } else {
+                        // Toggle quote state
+                        inQuotes = !inQuotes;
+                        currentRow += char;
+                    }
+                } else if (char === '\n' && !inQuotes) {
+                    // End of row (only if not inside quotes)
+                    if (currentRow.trim()) {
+                        rows.push(currentRow);
+                    }
+                    currentRow = '';
+                } else if (char === '\r' && csv[i + 1] === '\n' && !inQuotes) {
+                    // Windows line ending (CRLF) - skip \r
+                    if (currentRow.trim()) {
+                        rows.push(currentRow);
+                    }
+                    currentRow = '';
+                    i++; // Skip the \n
+                } else {
+                    currentRow += char;
+                }
+            }
+
+            // Don't forget the last row if there's no trailing newline
+            if (currentRow.trim()) {
+                rows.push(currentRow);
+            }
+
+            return rows;
         }
 
         function parseCSVLine(line) {
