@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select-none">
+    <title>Villain Classifier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background-color: #f5f5f5;
+            overflow-x: hidden;
+            touch-action: pan-y;
+        }
+        .header {
+            background: #2196F3;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+        .header-buttons {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .nav-header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-header {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background: rgba(255,255,255,0.3);
+            margin-top: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+            width: 0%;
+        }
+        .progress-text {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .file-upload {
+            margin: 20px;
+            padding: 40px 20px;
+            background: white;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .file-upload input {
+            margin: 10px 0;
+        }
+        .sentence-container {
+            position: relative;
+            min-height: calc(100vh - 290px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            padding-bottom: 40px;
+        }
+        .sentence-card {
+            background: white;
+            padding: 30px 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+            font-size: 18px;
+            line-height: 1.6;
+            text-align: center;
+            transition: transform 0.3s, opacity 0.3s;
+            touch-action: pan-x;
+            user-select: none;
+        }
+        .sentence-card.swipe-left {
+            transform: translateX(-50px);
+            opacity: 0.7;
+        }
+        .sentence-card.swipe-right {
+            transform: translateX(50px);
+            opacity: 0.7;
+        }
+        .current-label {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .current-label.villain {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .current-label.not-villain {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .current-label.unlabeled {
+            background: #f5f5f5;
+            color: #999;
+        }
+        .nav-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            min-width: 40px;
+        }
+        .nav-btn:active {
+            background: rgba(255,255,255,0.3);
+        }
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .controls button {
+            flex: 1;
+            max-width: 200px;
+            padding: 20px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        .controls button:active {
+            transform: scale(0.95);
+        }
+        .btn-villain {
+            background-color: #f44336;
+            color: white;
+        }
+        .btn-not-villain {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .swipe-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+        .modal.show {
+            display: block;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: calc(100vh - 40px);
+            overflow: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        .modal-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+        .close-btn {
+            font-size: 28px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            line-height: 1;
+        }
+        .table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th {
+            background: #2196F3;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #eee;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr.current-row {
+            background-color: #fff3cd !important;
+            font-weight: bold;
+        }
+        .labeled-yes {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .labeled-no {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .unlabeled {
+            color: #999;
+        }
+        #row-input::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+        #row-input::-webkit-outer-spin-button,
+        #row-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🦹 Villain Classifier</h1>
+        <div class="progress-text">
+            <span id="current">0</span> / <span id="total">0</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="header-buttons">
+            <div class="nav-header-buttons">
+                <button class="nav-btn" id="btn-prev">‹</button>
+                <input type="number" id="row-input" placeholder="Row #" min="1" style="width: 70px; padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.2); color: white; font-size: 14px; text-align: center;">
+                <button class="nav-btn" id="btn-next">›</button>
+            </div>
+            <button class="btn-header" id="btn-view-data">📊 View Data</button>
+            <button class="btn-header" id="btn-export">💾 Export</button>
+        </div>
+    </div>
+
+    <div id="upload-section" class="file-upload">
+        <h2>📁 Load CSV File</h2>
+        <p style="margin: 15px 0;">Select any CSV file to begin classification</p>
+        <input type="file" id="csvFile" accept=".csv,text/csv">
+    </div>
+
+    <div id="column-selection-section" class="file-upload hidden">
+        <h2>📋 Select Column to Classify</h2>
+        <p style="margin: 15px 0;">Choose which column you want to classify:</p>
+        <select id="column-select" style="padding: 10px; font-size: 16px; width: 100%; max-width: 400px; border-radius: 5px; border: 1px solid #ccc;">
+            <option value="">-- Select a column --</option>
+        </select>
+        <br><br>
+        <button id="btn-start-classification" class="btn-header" style="padding: 12px 30px; font-size: 16px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;" disabled>
+            Start Classification
+        </button>
+    </div>
+
+    <div id="classifier-section" class="hidden">
+        <div class="sentence-container">
+            <div class="sentence-card" id="sentence-card">
+                <div id="sentence-display">Sentence will appear here...</div>
+                <div class="current-label unlabeled" id="current-label">Not labeled</div>
+            </div>
+
+            <div class="swipe-hint">⬅️ Swipe to navigate | Use buttons to classify</div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-not-villain" id="btn-not-villain">
+                ✅ Not Villain
+            </button>
+            <button class="btn-villain" id="btn-villain">
+                🦹 Villain
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal for viewing data -->
+    <div id="dataModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📊 Classification Progress</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead id="tableHeader"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let csvData = [];
+        let currentIndex = 0;
+        let headers = [];
+        let selectedColumn = '';
+        let inputFileName = '';
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isSwiping = false;
+
+        const sentenceCard = document.getElementById('sentence-card');
+        const modal = document.getElementById('dataModal');
+
+        document.getElementById('csvFile').addEventListener('change', handleFileSelect);
+        document.getElementById('column-select').addEventListener('change', handleColumnSelect);
+        document.getElementById('btn-start-classification').addEventListener('click', startClassification);
+        document.getElementById('btn-villain').addEventListener('click', () => labelCurrent(1));
+        document.getElementById('btn-not-villain').addEventListener('click', () => labelCurrent(0));
+        document.getElementById('btn-prev').addEventListener('click', showPrevious);
+        document.getElementById('btn-next').addEventListener('click', showNext);
+        document.getElementById('row-input').addEventListener('keypress', handleRowInputKeypress);
+        document.getElementById('row-input').addEventListener('change', handleRowInputChange);
+        document.getElementById('btn-export').addEventListener('click', exportCSV);
+        document.getElementById('btn-view-data').addEventListener('click', showDataTable);
+        document.getElementById('closeModal').addEventListener('click', closeModal);
+
+        // Touch events for swipe navigation
+        sentenceCard.addEventListener('touchstart', handleTouchStart, { passive: true });
+        sentenceCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+        sentenceCard.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        function handleTouchStart(e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isSwiping = false;
+        }
+
+        function handleTouchMove(e) {
+            if (!isSwiping) {
+                const currentX = e.touches[0].clientX;
+                const currentY = e.touches[0].clientY;
+                const diffX = Math.abs(currentX - touchStartX);
+                const diffY = Math.abs(currentY - touchStartY);
+
+                // Determine if horizontal swipe
+                if (diffX > diffY && diffX > 10) {
+                    isSwiping = true;
+                }
+            }
+
+            if (isSwiping) {
+                e.preventDefault();
+                const currentX = e.touches[0].clientX;
+                const diffX = currentX - touchStartX;
+
+                if (diffX < -30) {
+                    sentenceCard.classList.add('swipe-left');
+                    sentenceCard.classList.remove('swipe-right');
+                } else if (diffX > 30) {
+                    sentenceCard.classList.add('swipe-right');
+                    sentenceCard.classList.remove('swipe-left');
+                } else {
+                    sentenceCard.classList.remove('swipe-left', 'swipe-right');
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (isSwiping) {
+                const touchEndX = e.changedTouches[0].clientX;
+                const diffX = touchEndX - touchStartX;
+
+                sentenceCard.classList.remove('swipe-left', 'swipe-right');
+
+                if (diffX < -50) {
+                    // Swipe left = Next
+                    showNext();
+                } else if (diffX > 50) {
+                    // Swipe right = Previous
+                    showPrevious();
+                }
+            }
+            isSwiping = false;
+        }
+
+        function showPrevious() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                displayCurrent();
+            }
+        }
+
+        function showNext() {
+            if (currentIndex < csvData.length - 1) {
+                currentIndex++;
+                displayCurrent();
+            }
+        }
+
+        function handleRowInputKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                jumpToRow();
+            }
+        }
+
+        function handleRowInputChange(event) {
+            jumpToRow();
+        }
+
+        function jumpToRow() {
+            const input = document.getElementById('row-input');
+            const rowNumber = parseInt(input.value);
+
+            if (isNaN(rowNumber) || rowNumber < 1 || rowNumber > csvData.length) {
+                alert(`Please enter a valid row number between 1 and ${csvData.length}`);
+                input.value = '';
+                return;
+            }
+
+            currentIndex = rowNumber - 1; // Convert to 0-based index
+            displayCurrent();
+            input.value = ''; // Clear the input after jumping
+            input.blur(); // Remove focus from input (hide keyboard on mobile)
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Store the input filename (without extension)
+            inputFileName = file.name.replace(/\.[^/.]+$/, '');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSV(e.target.result);
+            };
+            // Read as text with UTF-8 encoding
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function handleColumnSelect(event) {
+            const startBtn = document.getElementById('btn-start-classification');
+            if (event.target.value) {
+                startBtn.disabled = false;
+                selectedColumn = event.target.value;
+            } else {
+                startBtn.disabled = true;
+                selectedColumn = '';
+            }
+        }
+
+        function startClassification() {
+            if (!selectedColumn) {
+                alert('Please select a column first!');
+                return;
+            }
+
+            document.getElementById('column-selection-section').classList.add('hidden');
+            document.getElementById('classifier-section').classList.remove('hidden');
+            currentIndex = 0;
+            displayCurrent();
+        }
+
+        function parseCSV(csv) {
+            // Remove BOM if present
+            csv = csv.replace(/^\ufeff/, '');
+
+            const lines = csv.split('\n');
+            headers = parseCSVLine(lines[0]);
+
+            // Clean headers
+            headers = headers.map(h => h.trim());
+
+            // Add villain column if it doesn't exist
+            if (!headers.includes('villain')) {
+                headers.push('villain');
+            }
+
+            csvData = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+
+                const row = parseCSVLine(lines[i]);
+                if (row.length > 0) {
+                    const rowObj = {};
+                    headers.forEach((header, idx) => {
+                        rowObj[header] = idx < row.length ? row[idx].trim() : '';
+                    });
+                    csvData.push(rowObj);
+                }
+            }
+
+            if (csvData.length > 0) {
+                document.getElementById('upload-section').classList.add('hidden');
+                document.getElementById('column-selection-section').classList.remove('hidden');
+
+                // Populate column dropdown (exclude 'villain' column)
+                const columnSelect = document.getElementById('column-select');
+                columnSelect.innerHTML = '<option value="">-- Select a column --</option>';
+                headers.forEach(header => {
+                    if (header !== 'villain') {
+                        const option = document.createElement('option');
+                        option.value = header;
+                        option.textContent = header;
+                        columnSelect.appendChild(option);
+                    }
+                });
+            } else {
+                alert('No data found in CSV file!');
+            }
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    if (inQuotes && line[i + 1] === '"') {
+                        // Escaped quote
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current);
+            return result;
+        }
+
+        function displayCurrent() {
+            if (csvData.length === 0) return;
+
+            const row = csvData[currentIndex];
+            document.getElementById('sentence-display').textContent = row[selectedColumn] || '';
+            document.getElementById('current').textContent = currentIndex + 1;
+            document.getElementById('total').textContent = csvData.length;
+
+            // Update row input max attribute
+            document.getElementById('row-input').setAttribute('max', csvData.length);
+
+            // Update current label display
+            const labelDiv = document.getElementById('current-label');
+            const villainValue = row.villain;
+
+            if (villainValue === '1' || villainValue === 1) {
+                labelDiv.textContent = '🦹 Labeled: Villain';
+                labelDiv.className = 'current-label villain';
+            } else if (villainValue === '0' || villainValue === 0) {
+                labelDiv.textContent = '✅ Labeled: Not Villain';
+                labelDiv.className = 'current-label not-villain';
+            } else {
+                labelDiv.textContent = '⚪ Not labeled yet';
+                labelDiv.className = 'current-label unlabeled';
+            }
+
+            // Calculate progress based on labeled items
+            const labeledCount = csvData.filter(r => r.villain === '1' || r.villain === '0' || r.villain === 1 || r.villain === 0).length;
+            const progress = (labeledCount / csvData.length) * 100;
+            document.getElementById('progress-fill').style.width = progress + '%';
+
+            // Update navigation buttons
+            document.getElementById('btn-prev').disabled = currentIndex === 0;
+            document.getElementById('btn-next').disabled = currentIndex === csvData.length - 1;
+        }
+
+        function labelCurrent(value) {
+            if (csvData.length === 0) return;
+
+            csvData[currentIndex].villain = value;
+            displayCurrent();
+
+            // Auto-advance to next unlabeled sentence
+            setTimeout(() => {
+                const nextUnlabeled = findNextUnlabeled();
+                if (nextUnlabeled !== -1) {
+                    currentIndex = nextUnlabeled;
+                    displayCurrent();
+                } else if (currentIndex < csvData.length - 1) {
+                    // If no unlabeled found, just go to next
+                    showNext();
+                } else {
+                    // All done
+                    const allLabeled = csvData.every(r => r.villain === '1' || r.villain === '0' || r.villain === 1 || r.villain === 0);
+                    if (allLabeled) {
+                        alert('✅ All sentences classified! Click "Export" to save.');
+                    }
+                }
+            }, 300);
+        }
+
+        function findNextUnlabeled() {
+            for (let i = currentIndex + 1; i < csvData.length; i++) {
+                const val = csvData[i].villain;
+                if (val !== '1' && val !== '0' && val !== 1 && val !== 0) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function showDataTable() {
+            if (csvData.length === 0) {
+                alert('Please load a CSV file first!');
+                return;
+            }
+
+            // Create table header
+            const thead = document.getElementById('tableHeader');
+            thead.innerHTML = '';
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            // Create table body
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            csvData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                if (idx === currentIndex) {
+                    tr.classList.add('current-row');
+                }
+
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    // Don't use || for value, as it treats 0 as falsy
+                    const rawValue = row[header];
+                    const value = (rawValue !== undefined && rawValue !== null) ? rawValue : '';
+
+                    if (header === 'villain') {
+                        if (value === '1' || value === 1) {
+                            td.textContent = 'Villain';
+                            td.classList.add('labeled-yes');
+                        } else if (value === '0' || value === 0) {
+                            td.textContent = 'Not Villain';
+                            td.classList.add('labeled-no');
+                        } else {
+                            td.textContent = '-';
+                            td.classList.add('unlabeled');
+                        }
+                    } else {
+                        td.textContent = value;
+                    }
+
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            modal.classList.remove('show');
+        }
+
+        function exportCSV() {
+            if (csvData.length === 0) {
+                alert('No data to export!');
+                return;
+            }
+
+            // Create CSV with BOM for UTF-8
+            let csv = '\ufeff' + headers.join(',') + '\n';
+
+            csvData.forEach(row => {
+                const values = headers.map(header => {
+                    // Handle 0 explicitly - don't treat it as falsy
+                    const rawValue = row[header];
+                    const value = (rawValue !== undefined && rawValue !== null && rawValue !== '') ? String(rawValue) : '';
+                    // Escape quotes and wrap in quotes if contains comma, quote, or newline
+                    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\n';
+            });
+
+            // Create download with UTF-8 BOM
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+
+            // Use original filename with _labeled suffix and timestamp (date and time, no seconds)
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timestamp = `${year}-${month}-${day}_${hours}${minutes}`;
+
+            const filename = `${inputFileName}_labeled_${timestamp}.csv`;
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            alert('✅ CSV exported successfully!');
+        }
+    </script>
+</body>
+</html>
